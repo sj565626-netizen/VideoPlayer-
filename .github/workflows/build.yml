@@ -5,6 +5,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
@@ -13,9 +15,17 @@ jobs:
         run: |
           rm -rf src_proj && mkdir src_proj
           FOUND=""
-          for z in *.zip; do
-            if unzip -l "$z" | grep -q NowPlayingActivity.kt; then FOUND="$z"; fi
-          done
+          if [ -f VideoPlayer_updated.zip ]; then
+            FOUND="VideoPlayer_updated.zip"
+          else
+            BEST=0
+            for z in *.zip; do
+              if unzip -l "$z" | grep -q NowPlayingActivity.kt; then
+                T=$(git log -1 --format=%ct -- "$z")
+                if [ "${T:-0}" -ge "$BEST" ]; then BEST=${T:-0}; FOUND="$z"; fi
+              fi
+            done
+          fi
           if [ -z "$FOUND" ]; then echo "Naya zip nahi mila"; exit 1; fi
           echo "Using: $FOUND"
           unzip -o "$FOUND" -d src_proj
@@ -26,7 +36,7 @@ jobs:
           gradle-version: 8.7
       - name: Build
         working-directory: ${{ env.PROJ }}
-        run: gradle assembleDebug
+        run: gradle assembleDebug --stacktrace
       - uses: actions/upload-artifact@v4
         with:
           name: VideoPlayer-APK
