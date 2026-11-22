@@ -1,8 +1,5 @@
 name: Build APK
-on:
-  workflow_dispatch:
-  push:
-    branches: [main]
+on: [push, workflow_dispatch]
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -11,14 +8,26 @@ jobs:
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
-          java-version: '17'
+          java-version: 17
+      - name: Find and unzip the new project
+        run: |
+          rm -rf src_proj && mkdir src_proj
+          FOUND=""
+          for z in *.zip; do
+            if unzip -l "$z" | grep -q NowPlayingActivity.kt; then FOUND="$z"; fi
+          done
+          if [ -z "$FOUND" ]; then echo "Naya zip nahi mila"; exit 1; fi
+          echo "Using: $FOUND"
+          unzip -o "$FOUND" -d src_proj
+          D=$(dirname "$(find src_proj -name settings.gradle.kts | head -1)")
+          echo "PROJ=$D" >> $GITHUB_ENV
       - uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: 8.7
-      - run: unzip -q "VideoPlayer (1).zip" -d project
-      - run: gradle assembleDebug --no-daemon
-        working-directory: project
+      - name: Build
+        working-directory: ${{ env.PROJ }}
+        run: gradle assembleDebug
       - uses: actions/upload-artifact@v4
         with:
           name: VideoPlayer-APK
-          path: project/app/build/outputs/apk/debug/app-debug.apk
+          path: ${{ env.PROJ }}/app/build/outputs/apk/debug/*.apk
